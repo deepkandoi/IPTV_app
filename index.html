@@ -162,7 +162,7 @@ img{display:block;max-width:100%}
 .sechead h2{font-size:15.5px;margin:0;font-weight:600;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
 .sechead h2::before{content:"";width:3px;height:15px;border-radius:2px;background:var(--accent)}
 .sechead .link{font-size:12.5px;color:var(--dim);font-weight:500}
-.meta-row{padding:0 16px 6px;font-size:12px;color:var(--dimmer);display:flex;gap:10px;align-items:center}
+.meta-row{padding:0 16px 6px;font-size:12px;color:var(--dimmer);display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:6px}
 
 /* ============================================================
    Cards / lists
@@ -675,11 +675,17 @@ body.guide-open .nav{display:none}
 body.guide-open .content{padding-bottom:0}
 .pnum{position:absolute;top:6px;left:6px;padding:1px 5px;border-radius:5px;background:rgba(8,12,14,.62);
   color:#fff;font-size:9px;font-family:var(--mono);z-index:2}
-.meta-btns{display:flex;gap:6px;margin-left:auto}
+.meta-btns{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .meta-btns .mb{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--r-pill);
   background:var(--surface);border:1px solid var(--border);color:var(--dim);font-size:10.5px;font-weight:600}
 .meta-btns .mb svg{width:12px;height:12px}
 
+
+/* working / dead indicator */
+.okdot{position:absolute;bottom:7px;right:7px;width:9px;height:9px;border-radius:50%;
+  background:#3ddc84;box-shadow:0 0 0 2px rgba(6,10,12,.55);z-index:3}
+.okdot.bad{background:#ff5a5f}
+.okdot.sm{width:9px;height:9px;top:2px;right:2px;box-shadow:0 0 0 2px var(--surface)}
 
 /* ============================================================
    v6: stats pill, NEW badge, a11y, density, wide layout
@@ -929,7 +935,7 @@ window.SEED_PODS=[{"name":"The Ranveer Show","author":"Ranveer Allahbadia","genr
    StreamBox core: helpers, storage, parsers, network
    ============================================================ */
 'use strict';
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
@@ -1044,7 +1050,7 @@ const DEFAULT_SETTINGS = {
   epgUrl: '', hideAdult: true, pin: '', pinOnSettings: false, pinOnAdult: false,
   xtreamVod: true, exploreHome: true, defaultQuality: 'auto', speed: 1, resumeVod: true,
   hwDecode: true, epgOnCards: true,
-  autoRefresh: true, refreshHours: 12, dataSaver: false, a11y: false, density: 'comfortable',
+  autoRefresh: true, refreshHours: 12, autoCheck: true, dataSaver: false, a11y: false, density: 'comfortable',
   lang: 'en', gestures: true, bufferPill: true, engineSwitch: true,
   sleepTimer: 0, radioCountry: 'IN', preferredQuality: 'auto', animations: true
 };
@@ -1069,6 +1075,7 @@ function loadDB() {
     nums: parsed.nums || {},
     groups: Array.isArray(parsed.groups) ? parsed.groups : [],
     dead: Array.isArray(parsed.dead) ? parsed.dead : [],
+    health: parsed.health || { ts: 0, ok: {}, bad: {} },
     searchHistory: Array.isArray(parsed.searchHistory) ? parsed.searchHistory : [],
     bestUrl: parsed.bestUrl || {},
     cacheRadio: parsed.cacheRadio || null,
@@ -1088,6 +1095,7 @@ function save(now) {
   if (now) run(); else saveTimer = setTimeout(run, 400);
 }
 const PHOENIX_URL = 'https://imluke954.github.io/phoenix-iptv-india/india/index.m3u';
+const DEFAULT_EPG = 'https://iptv-org.github.io/epg/guides/in.epg.xml.gz';
 function defaultSources() {
   return [
     { id: 'phoenix-in', type: 'm3u', name: 'Phoenix IPTV · India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist' },
@@ -1102,6 +1110,26 @@ function defaultSources() {
     { id: 'iptv-kids', type: 'm3u', name: 'iptv-org · Kids', url: 'https://iptv-org.github.io/iptv/categories/kids.m3u', enabled: false, sub: 'Live public playlist' },
     { id: 'iptv-world', type: 'm3u', name: 'iptv-org · World (all)', url: 'https://iptv-org.github.io/iptv/index.m3u', enabled: false, sub: 'Very large · 10k+ channels' }
   ];
+}
+
+/* ---------- channel health ---------- */
+function healthState() {
+  if (!DB.health || typeof DB.health !== 'object') DB.health = { ts: 0, ok: {}, bad: {} };
+  if (!DB.health.ok) DB.health.ok = {};
+  if (!DB.health.bad) DB.health.bad = {};
+  return DB.health;
+}
+function workStatus(item) {
+  if (!item) return null;
+  const h = healthState();
+  if (h.ok[item.id]) return true;
+  if (h.bad[item.id]) return false;
+  return null;
+}
+function workingChannels(n) {
+  const h = healthState();
+  const ok = STATE.channels.filter((c) => h.ok[c.id]);
+  return n ? ok.slice(0, n) : ok;
 }
 
 /* ---------- one-time source migration ---------- */
@@ -1438,7 +1466,8 @@ const I18N = {
     'Next': 'अगला', 'Speed': 'गति', 'Subtitles': 'सबटाइटल', 'Audio only': 'केवल ऑडियो', 'Catch-up': 'कैच-अप',
     'Watch now': 'अभी देखें', 'Details': 'विवरण', 'Cancel': 'रद्द करें', 'Save': 'सहेजें', 'Add': 'जोड़ें',
     'Guide': 'गाइड', 'All channels': 'सभी चैनल', 'All stations': 'सभी स्टेशन', 'All shows': 'सभी शो',
-    'Clear': 'साफ़ करें', 'Now': 'अभी', 'Recent searches': 'हाल की खोजें', 'Open guide': 'गाइड खोलें', 'Movies': 'फ़िल्में', 'Series': 'सीरीज़', 'Live': 'लाइव'
+    'Clear': 'साफ़ करें', 'Now': 'अभी', 'Recent searches': 'हाल की खोजें', 'Open guide': 'गाइड खोलें',
+    'Working': 'चालू', 'Check': 'जाँच', 'Working channels': 'चालू चैनल', 'Re-check': 'फिर जाँचें', 'Movies': 'फ़िल्में', 'Series': 'सीरीज़', 'Live': 'लाइव'
   }
 };
 function t(key) {
@@ -1630,6 +1659,13 @@ function buildLibrary() {
   tv.concat(radio).forEach((it) => { it.isNew = !!newUrls[it.url]; });
 
   STATE.channels = tv; STATE.radio = radio;
+  const hs = DB.health;
+  if (hs && hs.ok) {
+    const live = {};
+    tv.forEach((c) => { live[c.id] = 1; });
+    Object.keys(hs.ok).forEach((k) => { if (!live[k]) delete hs.ok[k]; });
+    Object.keys(hs.bad).forEach((k) => { if (!live[k]) delete hs.bad[k]; });
+  }
 
   // podcasts
   const pods = [];
@@ -1677,6 +1713,8 @@ function cardHTML(it, opts) {
   const fav = isFav(kindFav, it.id);
   const now = epgNow(it);
   let badge = it.isNew ? '<span class="badge new">NEW</span>' : '<span class="badge live">Live</span>';
+  const ws = it.kind === 'tv' ? workStatus(it) : null;
+  const statusDot = ws === true ? '<span class="okdot" title="Working"></span>' : ws === false ? '<span class="okdot bad" title="Not reachable"></span>' : '';
   if (isCol) badge = '<span class="badge col">' + icon('layers') + ' ' + (it.col ? it.col.length : 0) + ' EP</span>';
   else if (it.kind === 'series') badge = '<span class="badge col">Series</span>';
   else if (it.movie) badge = '<span class="badge vod">Movie</span>';
@@ -1685,7 +1723,7 @@ function cardHTML(it, opts) {
     '<div class="thumb">' +
     plateHTML(it) +
     (thumbMode && !isCol ? '<video class="pv" muted playsinline preload="none" data-src="' + esc(it.url) + '"></video>' : '') +
-    badge +
+    badge + statusDot +
     '<button class="fav ' + (fav ? 'on' : '') + '" data-fav="' + it.id + '" data-kind="' + kindFav + '" aria-label="Favourite">' + icon(fav ? 'starFill' : 'star') + '</button>' +
     '</div>' +
     '<div class="cbody"><div class="cname">' + esc(it.name) + '</div>' +
@@ -1705,7 +1743,7 @@ function rowHTML(it) {
   const now = epgNow(it);
   const isCol = it.kind === 'collection';
   return '<div class="row ' + (playing ? 'playing' : '') + '" role="button" tabindex="0" data-play="' + it.id + '">' +
-    '<div class="av">' + plateHTML(it, 'small') + '</div>' +
+    '<div class="av">' + plateHTML(it, 'small') + (it.kind === 'tv' && workStatus(it) === true ? '<span class="okdot sm"></span>' : (it.kind === 'tv' && workStatus(it) === false ? '<span class="okdot sm bad"></span>' : '')) + '</div>' +
     '<div class="rbody"><div class="rname">' + (it.num ? '<span style="font-family:var(--mono);font-size:11px;color:var(--dimmer);margin-right:6px">' + it.num + '</span>' : '') + esc(it.name) + '</div>' +
     '<div class="rsub">' + esc(now || (isCol ? (it.col ? it.col.length + ' episodes' : 'Collection') : (it.group + (it.kind === 'radio' ? ' · Radio' : '')))) + '</div></div>' +
     '<div class="rtail">' + (playing ? '<span class="eq"><i></i><i></i><i></i><i></i></span>' : '') +
@@ -1724,6 +1762,7 @@ function filterList(list, q, cat) {
       if (!g || g.items.indexOf(it.id) === -1) return false;
     }
     else if (cat === 'New') { if (!it.isNew) return false; }
+    else if (cat === 'Working') { if (workStatus(it) !== true) return false; }
     else if (cat && cat !== 'All') {
       if ((it.cat || '') !== cat && (it.group || '') !== cat) return false;
     }
@@ -1738,6 +1777,10 @@ function chipsFor(list, key) {
   const favs = list.filter((it) => isFav(it.kind, it.id)).length;
   let html = '<button class="chip ' + (STATE.cat[key] === 'All' ? 'active' : '') + '" data-cat="' + key + '" data-val="All">' + t('All') + ' <span class="cnt">' + list.length + '</span></button>';
   if (favs) html += '<button class="chip ' + (STATE.cat[key] === 'Favourites' ? 'active' : '') + '" data-cat="' + key + '" data-val="Favourites">' + icon('starFill') + ' ' + t('Favourites') + ' <span class="cnt">' + favs + '</span></button>';
+  if (key === 'live') {
+    const okCount = list.filter((it) => workStatus(it) === true).length;
+    if (okCount) html += '<button class="chip ' + (STATE.cat.live === 'Working' ? 'active' : '') + '" data-cat="live" data-val="Working">' + icon('check') + ' ' + t('Working') + ' <span class="cnt">' + okCount + '</span></button>';
+  }
   const newCount = list.filter((it) => it.isNew).length;
   if (newCount) html += '<button class="chip ' + (STATE.cat[key] === 'New' ? 'active' : '') + '" data-cat="' + key + '" data-val="New">' + t('New') + ' <span class="cnt">' + newCount + '</span></button>';
   (DB.groups || []).forEach((g) => {
@@ -1760,7 +1803,8 @@ function renderLive(more) {
     $('#chips-live').innerHTML = chipsFor(STATE.channels, 'live');
     $('#meta-live').innerHTML = '<span>' + list.length + ' channels</span><span>·</span><span>' + (DB.sources.filter((s) => s.enabled).length) + ' sources</span>' +
       '<span class="meta-btns"><button class="mb" data-act="guide">' + icon('clock') + ' Guide</button>' +
-      '<button class="mb" data-act="jump">' + icon('list') + ' #</button></span>';
+      '<button class="mb" data-act="jump">' + icon('list') + ' #</button>' +
+      '<button class="mb" data-act="check">' + icon('check') + ' ' + t('Check') + '</button></span>';
   }
   const shown = list.slice(0, (STATE.liveShown = more ? (STATE.liveShown || PAGE) + PAGE : PAGE));
   const body = $('#body-live');
@@ -1969,7 +2013,9 @@ function renderSettings() {
   html += '<div class="group-title">' + t('Home & guide') + '</div><div class="group">' +
     srowNav('home-customize', 'Customise Home', 'Choose sections and their order', '', 'grid') +
     srowSwitch('exploreHome', 'Open Home first', 'Land on Home instead of Live TV', 'home') +
-    srowNav('guide', 'TV guide', STATE.epg ? Object.keys(STATE.epg).length + ' channels with data' : 'No EPG loaded', '', 'clock') +
+    srowNav('guide', 'TV guide', STATE.epg && Object.keys(STATE.epg).length ? Object.keys(STATE.epg).length + ' channels with data' : (DB.settings.epgUrl ? 'Auto · loading' : 'Auto (default India guide)'), '', 'clock') +
+    srowSwitch('autoEpg', 'Auto-load TV guide', 'Fetch an EPG automatically in the background', 'clock') +
+    srowSwitch('autoCheck', 'Auto-check channels', 'Verify streams once every 12 hours', 'check') +
     srowNav('health', 'Channel health check', 'Probe playlists and flag dead links', '', 'wifi') +
     srowNav('default-quality', 'Default quality', 'Preferred stream resolution', s.defaultQuality === 'auto' ? 'Auto' : s.defaultQuality, 'hd') +
     '</div>';
@@ -2165,7 +2211,11 @@ async function refreshSource(src) {
       src.updatedAt = Date.now();
       // grab EPG url from #EXTM3U x-tvg-url
       const m = /x-tvg-url="([^"]+)"/i.exec(txt);
-      if (m && !DB.settings.epgUrl) { DB.settings.epgUrl = m[1]; loadEPG(m[1], true); }
+      if (m) {
+        const epg = m[1].split(',')[0].trim();
+        src.epg = epg;
+        if (!DB.settings.epgUrl || !DB.epg.data) { DB.settings.epgUrl = epg; loadEPG(epg, true); }
+      }
       save(true); buildLibrary(); renderAll();
       toast(items.length + ' items' + (src.newUrls && src.newUrls.length ? ' · ' + src.newUrls.length + ' new' : ''));
     } else if (src.type === 'xtream') {
@@ -2487,7 +2537,14 @@ async function loadEPG(url, quiet) {
       const t = (p.querySelector('title') || {}).textContent || '';
       (map[ch] = map[ch] || []).push({ s: s, e: e || s + 1800e3, t: t.trim().slice(0, 90) });
     });
-    Object.keys(map).forEach((k) => map[k].sort((a, b) => a.s - b.s));
+    Object.keys(map).forEach((k) => { map[k].sort((a, b) => a.s - b.s); if (map[k].length > 48) map[k] = map[k].slice(0, 48); });
+    const ids = Object.keys(map);
+    if (ids.length > 600) {
+      const keep = {};
+      ids.slice(0, 600).forEach((k) => { keep[k] = map[k]; });
+      Object.keys(map).forEach((k) => { delete map[k]; });
+      Object.keys(keep).forEach((k) => { map[k] = keep[k]; });
+    }
     STATE.epg = map;
     STATE.epgNames = names;
     DB.epg = { url: url, data: map, ts: Date.now(), names: names };
@@ -2669,6 +2726,7 @@ function pcardFor(it, ratio) {
 
 const HOME_SECTIONS = [
   { id: 'continue', name: 'Continue watching', icon: 'history' },
+  { id: 'working', name: 'Working channels', icon: 'check' },
   { id: 'live', name: 'Live TV picks', icon: 'tv' },
   { id: 'guide', name: 'On now (guide)', icon: 'clock' },
   { id: 'radio', name: 'Radio for you', icon: 'radio' },
@@ -2709,6 +2767,12 @@ function renderHome() {
             '<div class="ptitle">' + esc(it.name) + '</div>' +
             '<div class="pmeta">' + esc(pos > 30 ? fmtTime(pos) + ' watched' : (it.group || '')) + '</div></div>';
         }), '<button class="link" data-act="clear-recents">' + t('Clear') + '</button>'));
+      }
+    } else if (id === 'working') {
+      const okList = workingChannels(12);
+      if (okList.length) {
+        parts.push(railHTML(t('Working channels'), okList.map((it) => pcardFor(it)),
+          '<button class="link" data-act="check">' + t('Re-check') + '</button>'));
       }
     } else if (id === 'live') {
       const picks = STATE.channels.slice(0, 12);
@@ -2929,55 +2993,79 @@ async function probeUrl(url, ms) {
   try {
     await fetch(url, { mode: 'no-cors', signal: ctl.signal, cache: 'no-store', credentials: 'omit' });
     clearTimeout(t);
+    try { ctl.abort(); } catch (e) { }   // stop the body so we don't pull a whole stream
     return true;
   } catch (e) {
     clearTimeout(t);
     return false;
   }
 }
+let HC_RUNNING = false;
+async function backgroundCheck(limit) {
+  if (HC_RUNNING) return;
+  HC_RUNNING = true;
+  const h = healthState();
+  const list = STATE.channels.slice(0, limit || 120);
+  let ok = 0;
+  for (let i = 0; i < list.length; i += 8) {
+    await Promise.all(list.slice(i, i + 8).map(async (ch) => {
+      const alive = await probeUrl(ch.url, 6000);
+      if (alive) { h.ok[ch.id] = Date.now(); delete h.bad[ch.id]; ok++; }
+      else { h.bad[ch.id] = Date.now(); delete h.ok[ch.id]; }
+    }));
+  }
+  h.ts = Date.now();
+  DB.dead = Object.keys(h.bad);
+  save(true); buildLibrary(); renderAll();
+  HC_RUNNING = false;
+  if (ok) toast(ok + ' channels verified working');
+}
+
 let HC_STOP = false;
-async function runHealthCheck() {
-  const list = STATE.channels.slice(0, 60);
+async function runHealthCheck(scope) {
+  const list = (scope === 'all' ? STATE.channels : STATE.channels).slice(0, scope === 'all' ? 400 : 120);
   if (!list.length) return toast('No channels to check');
-  const dead = [];
-  let done = 0;
+  const h = healthState();
+  let done = 0, ok = 0, bad = 0;
   HC_STOP = false;
   openSheet('Checking channels', '<div class="ext-empty"><div class="spinner" style="margin:0 auto 14px"></div>' +
     '<div id="hcProg" style="font-family:var(--mono);font-size:12px">0 / ' + list.length + '</div>' +
+    '<div id="hcBar" style="height:4px;width:180px;background:var(--surface-3);border-radius:2px;margin:12px auto 0;overflow:hidden">' +
+    '<i id="hcFill" style="display:block;height:100%;width:0;background:var(--accent);transition:width .2s"></i></div>' +
     '<button class="btn sm" id="hcStop" style="margin-top:16px">Stop</button></div>', {
     onOpen: (root) => { const b = root.querySelector('#hcStop'); if (b) b.onclick = () => { HC_STOP = true; toast('Stopping…'); }; }
   });
-  for (const ch of list) {
+  const paint = () => {
+    const p = $('#hcProg'), f = $('#hcFill');
+    if (p) p.textContent = done + ' / ' + list.length + ' · ' + ok + ' working · ' + bad + ' dead';
+    if (f) f.style.width = Math.round((done / list.length) * 100) + '%';
+  };
+  const BATCH = 8;
+  for (let i = 0; i < list.length; i += BATCH) {
     if (HC_STOP) break;
-    const ok = await probeUrl(ch.url, 7000);
-    if (!ok) dead.push(ch);
-    done++;
-    const p = $('#hcProg');
-    if (p) p.textContent = done + ' / ' + list.length + ' · ' + dead.length + ' unreachable';
+    const slice = list.slice(i, i + BATCH);
+    await Promise.all(slice.map(async (ch) => {
+      const alive = await probeUrl(ch.url, 7000);
+      if (alive) { h.ok[ch.id] = Date.now(); delete h.bad[ch.id]; ok++; }
+      else { h.bad[ch.id] = Date.now(); delete h.ok[ch.id]; bad++; }
+      done++;
+    }));
+    paint();
+    if (i % 40 === 0) save();
   }
+  h.ts = Date.now();
+  DB.dead = Object.keys(h.bad);
+  save(true); buildLibrary(); renderAll();
   if (!done) { closeSheet(); return toast('Check cancelled'); }
-  DB.dead = dead.map((c) => c.id);
-  save(true);
-  if (!dead.length) {
-    openSheet('Health check', emptyHTML('check', 'All ' + list.length + ' channels answered', 'No dead links found in the first ' + list.length + ' channels.'));
-    return;
-  }
-  const rows = dead.map((c) => '<div class="row"><div class="av">' + plateHTML(c, 'small') + '</div>' +
+  const deadList = list.filter((c) => h.bad[c.id]);
+  const rows = deadList.slice(0, 40).map((c) => '<div class="row"><div class="av">' + plateHTML(c, 'small') + '</div>' +
     '<div class="rbody"><div class="rname">' + esc(c.name) + '</div><div class="rsub">' + esc(c.group) + '</div></div></div>').join('');
-  openSheet('Health check', '<div style="padding:0 18px 10px;font-size:12px;color:var(--dim)">' + dead.length + ' of ' + list.length + ' did not answer within 7 seconds.</div>' +
-    '<div class="rows" style="padding:0">' + rows + '</div>' +
-    '<div style="padding:12px 16px 20px;display:flex;gap:8px"><button class="btn danger" style="flex:1" data-act="hc-hide">Hide these ' + dead.length + '</button>' +
-    '<button class="btn" data-act="hc-close">Keep</button></div>', {
-    onOpen: (root) => {
-      const h = root.querySelector('[data-act="hc-hide"]');
-      if (h) h.onclick = () => {
-        dead.forEach((c) => { if (DB.hidden.indexOf(c.id) === -1) DB.hidden.push(c.id); });
-        save(true); buildLibrary(); renderAll(); closeSheet(); toast(dead.length + ' hidden');
-      };
-      const c = root.querySelector('[data-act="hc-close"]');
-      if (c) c.onclick = closeSheet;
-    }
-  });
+  openSheet('Check complete', '<div style="padding:0 18px 12px;font-size:12.5px;color:var(--dim)">' +
+    '<b style="color:var(--accent)">' + ok + ' working</b> · ' + bad + ' not reachable · ' + done + ' checked</div>' +
+    (rows ? '<div class="rows" style="padding:0">' + rows + '</div>' : '') +
+    '<div style="padding:12px 16px 20px;display:flex;gap:8px">' +
+    (bad ? '<button class="btn danger" style="flex:1" data-act="flag-hide">Hide ' + bad + ' dead</button>' : '') +
+    '<button class="btn" style="flex:1" data-act="show-working">Show working only</button></div>');
 }
 
 /* ============================================================
@@ -4459,7 +4547,10 @@ function boot() {
     document.head.appendChild(ai);
   } catch (e) { }
 
+  STATE.epgNames = (DB.epg && DB.epg.names) || {};
+  if (!DB.settings.epgUrl && DB.settings.autoEpg !== false) { DB.settings.epgUrl = DEFAULT_EPG; save(); }
   if (DB.settings.epgUrl && !DB.epg.data) setTimeout(() => loadEPG(DB.settings.epgUrl, true), 2500);
+  if (DB.settings.autoCheck && Date.now() - (healthState().ts || 0) > 12 * 3600e3) setTimeout(() => backgroundCheck(80), 6000);
   if (DB.settings.autoRefresh !== false) setTimeout(autoRefreshSources, 3500);
   const phoenix = DB.sources.find((s) => s.url === PHOENIX_URL);
   if (phoenix && (!phoenix.items || presetsChanged)) {
