@@ -682,7 +682,7 @@ body.guide-open .content{padding-bottom:0}
 
 
 /* working / dead indicator */
-.okdot{position:absolute;bottom:7px;right:7px;width:9px;height:9px;border-radius:50%;
+.okdot{position:absolute;bottom:8px;right:8px;width:11px;height:11px;border-radius:50%;
   background:#3ddc84;box-shadow:0 0 0 2px rgba(6,10,12,.55);z-index:3}
 .okdot.bad{background:#ff5a5f}
 .okdot.sm{width:9px;height:9px;top:2px;right:2px;box-shadow:0 0 0 2px var(--surface)}
@@ -732,6 +732,61 @@ html[data-density="compact"] .pcard{flex:0 0 30%;max-width:118px}
   .nav{max-width:100%}
 }
 
+
+/* ============================================================
+   v7: YouTube-style feed, volume HUD, desktop sidebar
+   ============================================================ */
+.feed{display:flex;flex-direction:column;gap:16px;padding:8px 12px 14px}
+.frow{display:flex;gap:12px;align-items:flex-start;position:relative}
+.frow:active .fthumb{transform:scale(.985)}
+.fthumb{position:relative;flex:0 0 43%;max-width:200px;aspect-ratio:16/9;border-radius:12px;
+  overflow:hidden;background:linear-gradient(160deg,var(--surface-2),var(--surface));
+  transition:transform .15s var(--ease)}
+.fthumb .plate{left:12%;right:12%;top:12%;bottom:12%;border-radius:9px}
+.fdur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.8);color:#fff;font-size:9px;
+  font-weight:700;letter-spacing:.03em;padding:2px 5px;border-radius:4px;z-index:3}
+.fdur.live{background:#f03}
+.fbody{flex:1;min-width:0;padding-top:1px}
+.ftitle{font-size:13.5px;font-weight:600;line-height:1.35;letter-spacing:-.1px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fmeta{font-size:11.5px;color:var(--dimmer);margin-top:4px}
+@media (min-width:640px){
+  .feed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 16px}
+  .fthumb{flex:0 0 46%}
+}
+
+/* volume HUD */
+.volhud{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.92);
+  display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:14px;
+  background:rgba(8,12,14,.82);backdrop-filter:blur(10px);color:#fff;font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:8;
+  border:1px solid rgba(255,255,255,.12)}
+.volhud.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.volhud svg{width:18px;height:18px}
+.volhud b{font-family:var(--mono);font-size:13px;font-weight:600;min-width:28px;text-align:right}
+
+/* desktop: sidebar navigation + wider canvas */
+@media (min-width:1000px){
+  #app{padding-left:92px}
+  .nav{position:fixed;left:0;top:0;bottom:0;width:92px;height:100dvh;
+    grid-template-columns:1fr;grid-auto-rows:70px;align-content:start;justify-items:center;
+    padding:calc(var(--sat) + 84px) 0 0;border-top:0;border-right:1px solid var(--border);
+    background:var(--glass)}
+  .navitem{height:70px;width:100%}
+  .navitem .pill{width:56px;height:32px}
+  .navitem span{font-size:10.5px}
+  .topbar{padding-left:16px}
+  .content{padding-bottom:28px}
+  .mini{left:100px;right:auto;width:min(440px,42vw)}
+  .grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .feed{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .toast{bottom:24px}
+}
+@media (min-width:1400px){
+  .feed{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -761,22 +816,8 @@ html[data-density="compact"] .pcard{flex:0 0 30%;max-width:118px}
 
   <div class="content" id="content">
 
-    <!-- HOME / EXPLORE -->
-    <section class="view active" id="view-home">
-      <div class="searchwrap">
-        <label class="search">
-          <span data-icon="search"></span>
-          <input id="q-home" type="search" placeholder="Search everything — channels, radio, movies…" autocomplete="off">
-          <button class="clr hidden" data-clear="q-home" aria-label="Clear"><span data-icon="close"></span></button>
-        </label>
-        <button class="viewtoggle" id="homeRefresh" aria-label="Refresh explore"><span data-icon="refresh"></span></button>
-      </div>
-      <div class="chips" id="chips-home"></div>
-      <div id="body-home"></div>
-    </section>
-
     <!-- LIVE TV -->
-    <section class="view" id="view-live">
+    <section class="view active" id="view-live">
       <div class="searchwrap">
         <label class="search">
           <span data-icon="search"></span>
@@ -839,8 +880,7 @@ html[data-density="compact"] .pcard{flex:0 0 30%;max-width:118px}
   </div>
 
   <nav class="nav" id="nav">
-    <button class="navitem active" data-view="home"><span class="pill"><span data-icon="home"></span></span><span>Home</span></button>
-    <button class="navitem" data-view="live"><span class="pill"><span data-icon="tv"></span></span><span>Live TV</span></button>
+    <button class="navitem active" data-view="live"><span class="pill"><span data-icon="tv"></span></span><span>Live TV</span></button>
     <button class="navitem" data-view="radio"><span class="pill"><span data-icon="radio"></span></span><span>Radio</span></button>
     <button class="navitem" data-view="pod"><span class="pill"><span data-icon="mic"></span></span><span>Podcasts</span></button>
     <button class="navitem" data-view="lib"><span class="pill"><span data-icon="bookmark"></span></span><span>Library</span></button>
@@ -902,6 +942,7 @@ html[data-density="compact"] .pcard{flex:0 0 30%;max-width:118px}
         </div>
       </div>
     </div>
+    <div class="volhud" id="volHud"><span data-icon="volume"></span><b id="volVal">100</b></div>
     <div class="pmenu" id="pMenu"></div>
   </div>
 </div>
@@ -935,7 +976,7 @@ window.SEED_PODS=[{"name":"The Ranveer Show","author":"Ranveer Allahbadia","genr
    StreamBox core: helpers, storage, parsers, network
    ============================================================ */
 'use strict';
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
@@ -1043,14 +1084,15 @@ function initials(name) {
 /* ---------- storage ---------- */
 const STORE_KEY = 'streambox.v1';
 const DEFAULT_SETTINGS = {
-  theme: 'dark', accent: 'green', density: 'comfortable', layout: 'grid',
+  theme: 'dark', accent: 'green', density: 'comfortable', layout: 'feed',
   autoplay: true, autoNextOnError: true, resume: true, background: true,
   engine: 'auto', lowLatency: false, buffer: 30, timeout: 20,
   aspect: 'contain', showLogos: true, groupBy: 'category', sortBy: 'name',
   epgUrl: '', hideAdult: true, pin: '', pinOnSettings: false, pinOnAdult: false,
   xtreamVod: true, exploreHome: true, defaultQuality: 'auto', speed: 1, resumeVod: true,
   hwDecode: true, epgOnCards: true,
-  autoRefresh: true, refreshHours: 12, autoCheck: true, dataSaver: false, a11y: false, density: 'comfortable',
+  autoRefresh: true, refreshHours: 12, autoCheck: true,
+  resumeLast: true, showDots: true, dataSaver: false, a11y: false, density: 'comfortable',
   lang: 'en', gestures: true, bufferPill: true, engineSwitch: true,
   sleepTimer: 0, radioCountry: 'IN', preferredQuality: 'auto', animations: true
 };
@@ -1094,11 +1136,11 @@ function save(now) {
   };
   if (now) run(); else saveTimer = setTimeout(run, 400);
 }
-const PHOENIX_URL = 'https://imluke954.github.io/phoenix-iptv-india/india/index.m3u';
+const PHOENIX_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
 const DEFAULT_EPG = 'https://iptv-org.github.io/epg/guides/in.epg.xml.gz';
 function defaultSources() {
   return [
-    { id: 'phoenix-in', type: 'm3u', name: 'Phoenix IPTV · India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist' },
+    { id: 'phoenix-in', type: 'm3u', name: 'Free-TV · World + India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist · 2200+ channels' },
     { id: 'seed-tv', type: 'builtin', name: 'India Live TV (preloaded)', sub: '271 verified free channels', enabled: true, builtin: 'tv' },
     { id: 'seed-radio', type: 'builtin', name: 'India FM & Radio (preloaded)', sub: '149 stations', enabled: true, builtin: 'radio' },
     { id: 'iptv-in', type: 'm3u', name: 'iptv-org · India', url: 'https://iptv-org.github.io/iptv/countries/in.m3u', enabled: false, sub: 'Live public playlist' },
@@ -1134,17 +1176,21 @@ function workingChannels(n) {
 
 /* ---------- one-time source migration ---------- */
 function ensurePresets() {
-  if (DB.presetV === 2) return false;
+  if (DB.presetV === 3) return false;
   let changed = false;
-  if (!DB.sources.some((s) => s.url === PHOENIX_URL)) {
-    DB.sources.unshift({ id: 'phoenix-in', type: 'm3u', name: 'Phoenix IPTV · India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist' });
+  const pre = DB.sources.find((s) => s.id === 'phoenix-in' || /phoenix-iptv-india/i.test(s.url || ''));
+  if (pre) {
+    if (pre.url !== PHOENIX_URL) { pre.url = PHOENIX_URL; pre.name = 'Free-TV · World + India'; pre.items = null; pre.failed = false; pre.sub = 'Preinstalled playlist · 2200+ channels'; changed = true; }
+    if (!pre.enabled) { pre.enabled = true; changed = true; }
+  } else {
+    DB.sources.unshift({ id: 'phoenix-in', type: 'm3u', name: 'Free-TV · World + India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist · 2200+ channels' });
     changed = true;
   }
   DB.sources.forEach((s) => {
-    if (s.id === 'phoenix-in') { if (!s.enabled) { s.enabled = true; changed = true; } return; }
+    if (s.id === 'phoenix-in') return;
     if (s.type === 'm3u' && /iptv-org\.github\.io/i.test(s.url || '') && s.enabled) { s.enabled = false; changed = true; }
   });
-  DB.presetV = 2;
+  DB.presetV = 3;
   save(true);
   return changed;
 }
@@ -1713,7 +1759,7 @@ function cardHTML(it, opts) {
   const fav = isFav(kindFav, it.id);
   const now = epgNow(it);
   let badge = it.isNew ? '<span class="badge new">NEW</span>' : '<span class="badge live">Live</span>';
-  const ws = it.kind === 'tv' ? workStatus(it) : null;
+  const ws = it.kind === 'tv' && DB.settings.showDots ? workStatus(it) : null;
   const statusDot = ws === true ? '<span class="okdot" title="Working"></span>' : ws === false ? '<span class="okdot bad" title="Not reachable"></span>' : '';
   if (isCol) badge = '<span class="badge col">' + icon('layers') + ' ' + (it.col ? it.col.length : 0) + ' EP</span>';
   else if (it.kind === 'series') badge = '<span class="badge col">Series</span>';
@@ -1736,6 +1782,25 @@ function shade(hex) {
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   } catch (e) { return hex; }
 }
+function feedRowHTML(it) {
+  const kindFav = it.kind === 'radio' ? 'radio' : 'tv';
+  const fav = isFav(kindFav, it.id);
+  const ws = it.kind === 'tv' ? workStatus(it) : null;
+  const dot = !DB.settings.showDots || ws === null ? '' : ws ? '<span class="okdot sm"></span>' : '<span class="okdot sm bad"></span>';
+  const isCol = it.kind === 'collection';
+  return '<div class="frow" role="button" tabindex="0" data-play="' + it.id + '">' +
+    '<div class="fthumb">' + plateHTML(it) + dot +
+    (isCol ? '<span class="fdur">' + (it.col ? it.col.length : 0) + ' EP</span>' : '<span class="fdur live">LIVE</span>') +
+    '</div>' +
+    '<div class="fbody">' +
+    '<div class="ftitle">' + esc(it.name) + '</div>' +
+    '<div class="fmeta">' + esc(it.group || 'Live') + (it.num ? ' · #' + it.num : '') + '</div>' +
+    (it.isNew ? '<span class="badge new" style="position:static;display:inline-flex;margin-top:5px">NEW</span>' : '') +
+    '</div>' +
+    '<button class="fav" data-fav="' + it.id + '" data-kind="' + kindFav + '" style="position:static;width:34px;height:34px;background:none;color:' + (fav ? 'var(--accent)' : 'var(--dimmer)') + '">' + icon(fav ? 'starFill' : 'star') + '</button>' +
+    '</div>';
+}
+
 function rowHTML(it) {
   const playing = STATE.playingId === it.id;
   const kindFav = it.kind === 'radio' ? 'radio' : 'tv';
@@ -1813,9 +1878,15 @@ function renderLive(more) {
     body.innerHTML = emptyHTML('tv', 'No channels found', STATE.q.live ? 'Nothing matches "' + esc(STATE.q.live) + '". Try another name or clear the filter.' : 'Enable a playlist in Settings → Playlists to add more channels.');
     return;
   }
-  const rails = (!more && STATE.cat.live === 'All' && !STATE.q.live) ? railsHTML() : '';
-  const mode = DB.settings.layout;
-  if (mode === 'list') {
+  let rails = (!more && STATE.cat.live === 'All' && !STATE.q.live) ? railsHTML() : '';
+  if (!more && !STATE.q.live && STATE.cat.live === 'All') {
+    const okList = workingChannels(12);
+    if (okList.length) rails = workingRailHTML(okList) + rails;
+  }
+  const mode = DB.settings.layout || 'feed';
+  if (mode === 'feed') {
+    body.innerHTML = rails + '<div class="feed">' + shown.map((it) => feedRowHTML(it)).join('') + '</div>' + (list.length > shown.length ? moreBtn(list.length - shown.length) : '');
+  } else if (mode === 'list') {
     body.innerHTML = rails + '<div class="rows">' + shown.map((it) => rowHTML(it)).join('') + '</div>' + (list.length > shown.length ? moreBtn(list.length - shown.length) : '');
   } else {
     const thumb = mode === 'thumb';
@@ -1978,7 +2049,9 @@ function renderSettings() {
     srowNav('logo-pack', 'Logo pack', Object.keys(DB.logos || {}).length ? Object.keys(DB.logos).length + ' custom logos' : 'Import name → logo URLs', '', 'palette') +
     srowNav('theme', 'Theme', 'Dark, AMOLED, light or system', themeLabel, 'moon') +
     srowNav('accent', 'Accent colour', 'Material You style tint', s.accent, 'palette') +
-    srowNav('layout', 'Channel layout', 'Grid, live thumbnails or list', s.layout === 'grid' ? 'Grid' : s.layout === 'thumb' ? 'Thumbnails' : 'List', 'grid') +
+    srowNav('layout', 'Channel layout', 'Feed, grid, thumbnails or list', s.layout === 'feed' ? 'Feed' : s.layout === 'grid' ? 'Grid' : s.layout === 'thumb' ? 'Thumbnails' : 'List', 'grid') +
+    srowSwitch('showDots', 'Working status dots', 'Green = working, red = unreachable', 'check') +
+    srowSwitch('resumeLast', 'Resume last channel', 'Start where you left off', 'play2') +
     srowSwitch('showLogos', 'Channel logos', 'Off = faster loading, initial tiles') +
     srowSwitch('animations', 'Motion & transitions', 'Turn off for older devices', 'bolt') +
     '</div>';
@@ -2011,7 +2084,6 @@ function renderSettings() {
     '</div>';
 
   html += '<div class="group-title">' + t('Home & guide') + '</div><div class="group">' +
-    srowNav('home-customize', 'Customise Home', 'Choose sections and their order', '', 'grid') +
     srowSwitch('exploreHome', 'Open Home first', 'Land on Home instead of Live TV', 'home') +
     srowNav('guide', 'TV guide', STATE.epg && Object.keys(STATE.epg).length ? Object.keys(STATE.epg).length + ' channels with data' : (DB.settings.epgUrl ? 'Auto · loading' : 'Auto (default India guide)'), '', 'clock') +
     srowSwitch('autoEpg', 'Auto-load TV guide', 'Fetch an EPG automatically in the background', 'clock') +
@@ -2716,6 +2788,12 @@ function railHTML(title, cards, action) {
   if (!cards || !cards.length) return '';
   return '<div class="sechead"><h2>' + esc(title) + '</h2>' + (action || '') + '</div><div class="prail">' + cards.join('') + '</div>';
 }
+function workingRailHTML(list) {
+  if (!list || !list.length) return '';
+  return '<div class="sechead"><h2><span class="okdot sm" style="position:static;display:inline-block;margin-right:6px"></span>' + t('Working channels') + '</h2>' +
+    '<button class="link" data-act="check">' + t('Re-check') + '</button></div><div class="prail">' +
+    list.map((it) => pcardFor(it)).join('') + '</div>';
+}
 function pcardFor(it, ratio) {
   const num = it.num ? '<span class="pnum">' + it.num + '</span>' : '';
   return '<div class="pcard" role="button" tabindex="0" data-play="' + it.id + '">' +
@@ -3235,6 +3313,7 @@ function playItem(item, list) {
   }
   P.item = item;
   P.gen++;
+  DB.lastChannel = item.id; save();
   P.altIdx = 0; P.engineTried = false; P.engineOverride = null; P.drmChecked = false;
   P.list = Array.isArray(list) && list.length ? list : [item];
   P.idx = Math.max(0, P.list.findIndex((x) => x.id === item.id));
@@ -3923,7 +4002,7 @@ video.addEventListener('ended', () => {
 });
 
 /* ---------- global wiring ---------- */
-let _prevTab = 'home';
+let _prevTab = 'live';
 function switchTab(tab, skipSave) {
   if (tab !== 'settings' && STATE.tab !== 'settings') _prevTab = STATE.tab;
   STATE.tab = tab;
@@ -3931,7 +4010,6 @@ function switchTab(tab, skipSave) {
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + tab));
   $$('.navitem').forEach((n) => n.classList.toggle('active', n.dataset.view === tab));
   const titles = {
-    home: ['Home', 'Explore · live · radio'],
     live: ['Live TV', 'Free channels, ready to play'],
     radio: ['Radio', 'India FM, devotional & more'],
     pod: ['Podcasts', 'Shows and episodes'],
@@ -3946,7 +4024,6 @@ function switchTab(tab, skipSave) {
   $('#btnSearchTop').style.display = (inSettings || tab === 'lib') ? 'none' : 'grid';
   $('#btnRefresh').style.display = inSettings ? 'none' : 'grid';
   if (tab !== 'live' && typeof stopAllPreviews === 'function') stopAllPreviews();
-  if (tab === 'home') renderHome();
   if (tab === 'lib') renderLib();
   if (tab === 'settings') renderSettings();
   if (!skipSave) save();
@@ -3970,7 +4047,6 @@ function rememberSearch(term) {
 
 function renderAll() {
   renderLive(); renderRadio(); renderPod(); renderLib();
-  if (STATE.tab === 'home') renderHome();
   if (STATE.tab === 'settings') renderSettings();
 }
 
@@ -3990,8 +4066,6 @@ function handleAction(act, el) {
     }
     case 'go-settings': switchTab('settings'); break;
     case 'clear-recents': DB.recents = []; save(true); renderAll(); toast('History cleared'); break;
-    case 'clear-searches': DB.searchHistory = []; save(true); renderHome(); toast('Searches cleared'); break;
-    case 'home-customize': openHomeCustomize(); break;
     case 'go-live': switchTab('live'); break;
     case 'go-radio': switchTab('radio'); break;
     case 'go-pod': switchTab('pod'); break;
@@ -4164,7 +4238,6 @@ document.addEventListener('click', (e) => {
       if (DB.settings.pin) return requirePin(() => handleItem(it, list));
     }
     if ($('#guide').classList.contains('open')) closeGuide();
-    if ((STATE.q.home || '').trim() && STATE.tab === 'home') rememberSearch(STATE.q.home.trim());
     handleItem(it, list);
     return;
   }
@@ -4205,7 +4278,6 @@ document.addEventListener('click', (e) => {
     const inp = $('#' + clr.dataset.clear);
     inp.value = ''; STATE.q[clr.dataset.clear.split('-')[1]] = '';
     clr.classList.add('hidden');
-    if (clr.dataset.clear === 'q-home') { STATE.q.home = ''; renderHome(); }
     if (clr.dataset.clear === 'q-live') renderLive();
     if (clr.dataset.clear === 'q-radio') renderRadio();
     if (clr.dataset.clear === 'q-pod') renderPod();
@@ -4225,13 +4297,6 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('input', debounce((e) => {
   const t = e.target;
-  if (t.id === 'q-home') {
-    STATE.q.home = t.value;
-    const clr0 = $('[data-clear="q-home"]');
-    if (clr0) clr0.classList.toggle('hidden', !t.value);
-    renderHomeResults(t.value);
-    return;
-  }
   if (t.id === 'q-live' || t.id === 'q-radio' || t.id === 'q-pod') {
     const k = t.id.split('-')[1];
     STATE.q[k] = t.value;
@@ -4262,7 +4327,9 @@ $('#pFwd15').addEventListener('click', () => seekBy(15));
 $('#pBack15').addEventListener('click', () => seekBy(-15));
 $('#pMute').addEventListener('click', () => {
   video.muted = !video.muted;
+  if (!video.muted && video.volume === 0) video.volume = 0.8;
   $('#pMute').innerHTML = icon(video.muted ? 'mute' : 'volume');
+  showVolHud();
 });
 $('#pAspect').addEventListener('click', () => {
   const order = ['contain', 'cover', 'fill', 'zoom'];
@@ -4289,6 +4356,22 @@ $('#pFav').addEventListener('click', () => {
   if (STATE.tab === 'lib') renderLib();
 });
 $('#pMore').addEventListener('click', (e) => { e.stopPropagation(); openPlayerMenu(); });
+/* ---------- volume HUD ---------- */
+let volHudT = null;
+function showVolHud() {
+  const hud = $('#volHud'); if (!hud) return;
+  const v = video.muted ? 0 : Math.round(video.volume * 100);
+  $('#volVal').textContent = v;
+  hud.classList.add('show');
+  clearTimeout(volHudT);
+  volHudT = setTimeout(() => hud.classList.remove('show'), 1100);
+}
+function setVolume(v) {
+  video.volume = Math.min(1, Math.max(0, v));
+  video.muted = video.volume === 0;
+  showVolHud();
+}
+
 /* gestures: double-tap seek, long-press 2x, vertical swipe for volume */
 (function initGestures() {
   const stage = $('#pStage');
@@ -4310,16 +4393,14 @@ $('#pMore').addEventListener('click', (e) => { e.stopPropagation(); openPlayerMe
     if (Math.abs(dy) > 18) { moved = true; clearTimeout(longT); }
     if (moved && t.clientX > window.innerWidth * 0.5 && !e.target.closest('.pmenu')) {
       swiping = true;
-      const v = Math.min(1, Math.max(0, startVol - dy / 260));
-      video.volume = v;
-      if (video.muted) video.muted = false;
+      setVolume(startVol - dy / 260);
     }
   }, { passive: true });
   stage.addEventListener('touchend', (e) => {
     if (!DB.settings.gestures) return;
     clearTimeout(longT);
     if (video.playbackRate === 2) { video.playbackRate = +DB.settings.speed || 1; }
-    if (swiping) { toast('Volume ' + Math.round(video.volume * 100) + '%'); swiping = false; return; }
+    if (swiping) { swiping = false; return; }
     if (moved) return;
     const now = Date.now();
     const t = (e.changedTouches && e.changedTouches[0]) || {};
@@ -4335,6 +4416,31 @@ $('#pMore').addEventListener('click', (e) => { e.stopPropagation(); openPlayerMe
       lastTap = 0;
     } else lastTap = now;
   }, { passive: true });
+})();
+
+/* mouse: drag vertically to change volume, wheel to nudge it */
+(function initMouseVolume() {
+  const stage = $('#pStage');
+  let dragging = false, startY = 0, startVol = 1, moved = false;
+  stage.addEventListener('mousedown', (e) => {
+    if (!DB.settings.gestures || e.button !== 0) return;
+    if (e.target.closest('.pbtn') || e.target.closest('.pmenu') || e.target.closest('.perror') || e.target.closest('button')) return;
+    dragging = true; moved = false; startY = e.clientY; startVol = video.muted ? 0 : video.volume;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dy = e.clientY - startY;
+    if (Math.abs(dy) > 6) moved = true;
+    if (moved) { setVolume(startVol - dy / 220); e.preventDefault(); }
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+  stage.addEventListener('wheel', (e) => {
+    if (!DB.settings.gestures) return;
+    if (e.target.closest('.pmenu')) return;
+    e.preventDefault();
+    const cur = video.muted ? 0 : video.volume;
+    setVolume(cur + (e.deltaY < 0 ? 0.05 : -0.05));
+  }, { passive: false });
 })();
 
 $('#pStage').addEventListener('click', (e) => {
@@ -4367,24 +4473,23 @@ $('#btnSettings').addEventListener('click', () => {
   else switchTab('settings');
 });
 $('#btnSearchTop').addEventListener('click', () => {
-  const map = { home: '#q-home', live: '#q-live', radio: '#q-radio', pod: '#q-pod' };
+  const map = { live: '#q-live', radio: '#q-radio', pod: '#q-pod' };
   const inp = $(map[STATE.tab] || '#q-live');
   if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); }
 });
-const LAYOUTS = ['grid', 'thumb', 'list'];
-const LAYOUT_ICON = { grid: 'eye', thumb: 'list', list: 'grid' };
+const LAYOUTS = ['feed', 'grid', 'thumb', 'list'];
+const LAYOUT_ICON = { feed: 'grid', grid: 'eye', thumb: 'list', list: 'layers' };
 $('#liveLayout').addEventListener('click', () => {
   const i = LAYOUTS.indexOf(DB.settings.layout);
   DB.settings.layout = LAYOUTS[(i + 1) % LAYOUTS.length];
   save(true);
   $('#liveLayout').innerHTML = icon(LAYOUT_ICON[DB.settings.layout]);
-  toast(DB.settings.layout === 'thumb' ? 'Live thumbnails on' : DB.settings.layout === 'list' ? 'List view' : 'Grid view');
+  const names = { feed: 'Feed view', grid: 'Grid view', thumb: 'Live thumbnails', list: 'List view' };
+  toast(names[DB.settings.layout] || 'Layout changed');
   renderLive();
 });
-$('#homeRefresh').addEventListener('click', () => { renderHome(); toast('Home refreshed'); });
-$('#q-home').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); rememberSearch(e.target.value.trim()); renderHomeResults(e.target.value); e.target.blur(); }
-});
+
+
 $('#gClose').addEventListener('click', closeGuide);
 $('#gNow').addEventListener('click', () => { renderGuide(); });
 $('#radioAdd').addEventListener('click', addRadioDialog);
@@ -4396,6 +4501,7 @@ window.addEventListener('popstate', () => {
   else if ($('#dialog').classList.contains('show')) closeDialog();
 });
 
+let zapBuf = '', zapT = null;
 document.addEventListener('keydown', (e) => {
   const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (inField) { if (e.key === 'Escape') document.activeElement.blur(); return; }
@@ -4407,6 +4513,18 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') nextChannel(-1);
   else if (e.key === 'f') $('#pFull').click();
   else if (e.key === 'm') $('#pMute').click();
+  else if (/^[0-9]$/.test(e.key)) {
+    zapBuf += e.key;
+    clearTimeout(zapT);
+    zapT = setTimeout(() => {
+      const n = parseInt(zapBuf, 10); zapBuf = '';
+      const ch = STATE.channels.find((c) => c.num === n);
+      if (ch) { P.list = STATE.channels; playItem(ch, STATE.channels); }
+      else toast('No channel #' + n);
+    }, 900);
+  }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setVolume((video.muted ? 0 : video.volume) + 0.05); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); setVolume((video.muted ? 0 : video.volume) - 0.05); }
 });
 
 /* long-press for quick actions on channels */
@@ -4518,10 +4636,8 @@ function boot() {
   const presetsChanged = ensurePresets();
   buildLibrary();
   renderAll();
-  let landing = DB.tab || 'home';
-  if (DB.firstRun && DB.settings.exploreHome !== false) landing = 'home';
-  if (landing === 'home' && DB.settings.exploreHome === false) landing = 'live';
-  if (landing === 'settings') landing = 'live';
+  let landing = DB.tab || 'live';
+  if (landing === 'home' || landing === 'settings') landing = 'live';
   switchTab(landing, true);
 
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (DB.settings.theme === 'system') applyTheme(); });
@@ -4550,6 +4666,10 @@ function boot() {
   STATE.epgNames = (DB.epg && DB.epg.names) || {};
   if (!DB.settings.epgUrl && DB.settings.autoEpg !== false) { DB.settings.epgUrl = DEFAULT_EPG; save(); }
   if (DB.settings.epgUrl && !DB.epg.data) setTimeout(() => loadEPG(DB.settings.epgUrl, true), 2500);
+  if (DB.settings.resumeLast && DB.lastChannel) {
+    const last = findItem(DB.lastChannel);
+    if (last) setTimeout(() => { if (!P.item) playItem(last, STATE.channels); }, 1400);
+  }
   if (DB.settings.autoCheck && Date.now() - (healthState().ts || 0) > 12 * 3600e3) setTimeout(() => backgroundCheck(80), 6000);
   if (DB.settings.autoRefresh !== false) setTimeout(autoRefreshSources, 3500);
   const phoenix = DB.sources.find((s) => s.url === PHOENIX_URL);
