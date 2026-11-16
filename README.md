@@ -3,7 +3,7 @@
 A single-file mobile web app for watching free live TV, listening to Indian radio, and playing podcasts. No account, no server, no build step — everything runs in the browser and your data stays on the device.
 
 **Live:** https://deepkandoi.github.io/IPTV_app/  
-_(served from the `streambox` branch — the original Express app on `main` is untouched)_
+_(published from the `gh-pages` branch — the original Express app on `main` is untouched)_
 
 ## What's inside
 
