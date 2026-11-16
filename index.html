@@ -929,7 +929,7 @@ window.SEED_PODS=[{"name":"The Ranveer Show","author":"Ranveer Allahbadia","genr
    StreamBox core: helpers, storage, parsers, network
    ============================================================ */
 'use strict';
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
@@ -1087,8 +1087,10 @@ function save(now) {
   };
   if (now) run(); else saveTimer = setTimeout(run, 400);
 }
+const PHOENIX_URL = 'https://imluke954.github.io/phoenix-iptv-india/india/index.m3u';
 function defaultSources() {
   return [
+    { id: 'phoenix-in', type: 'm3u', name: 'Phoenix IPTV · India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist' },
     { id: 'seed-tv', type: 'builtin', name: 'India Live TV (preloaded)', sub: '271 verified free channels', enabled: true, builtin: 'tv' },
     { id: 'seed-radio', type: 'builtin', name: 'India FM & Radio (preloaded)', sub: '149 stations', enabled: true, builtin: 'radio' },
     { id: 'iptv-in', type: 'm3u', name: 'iptv-org · India', url: 'https://iptv-org.github.io/iptv/countries/in.m3u', enabled: false, sub: 'Live public playlist' },
@@ -1100,6 +1102,23 @@ function defaultSources() {
     { id: 'iptv-kids', type: 'm3u', name: 'iptv-org · Kids', url: 'https://iptv-org.github.io/iptv/categories/kids.m3u', enabled: false, sub: 'Live public playlist' },
     { id: 'iptv-world', type: 'm3u', name: 'iptv-org · World (all)', url: 'https://iptv-org.github.io/iptv/index.m3u', enabled: false, sub: 'Very large · 10k+ channels' }
   ];
+}
+
+/* ---------- one-time source migration ---------- */
+function ensurePresets() {
+  if (DB.presetV === 2) return false;
+  let changed = false;
+  if (!DB.sources.some((s) => s.url === PHOENIX_URL)) {
+    DB.sources.unshift({ id: 'phoenix-in', type: 'm3u', name: 'Phoenix IPTV · India', url: PHOENIX_URL, enabled: true, sub: 'Preinstalled playlist' });
+    changed = true;
+  }
+  DB.sources.forEach((s) => {
+    if (s.id === 'phoenix-in') { if (!s.enabled) { s.enabled = true; changed = true; } return; }
+    if (s.type === 'm3u' && /iptv-org\.github\.io/i.test(s.url || '') && s.enabled) { s.enabled = false; changed = true; }
+  });
+  DB.presetV = 2;
+  save(true);
+  return changed;
 }
 
 /* ---------- toast / sheet / dialog ---------- */
@@ -2015,7 +2034,7 @@ function openPlaylists() {
     const on = s.enabled !== false;
     return '<div class="srow" style="padding:12px 16px">' +
       '<div class="sic">' + icon(s.type === 'builtin' ? 'layers' : s.type === 'xtream' ? 'key' : 'link') + '</div>' +
-      '<div class="stxt"><div class="stitle">' + esc(s.name) + '</div>' +
+      '<div class="stxt"><div class="stitle">' + esc(s.name) + (s.failed ? ' <span style="color:#ff6b6d;font-size:10px">● FAILED</span>' : '') + '</div>' +
       '<div class="ssub">' + esc(s.sub || s.url || s.type) + (s.items ? ' · ' + s.items.length + ' items' : '') + '</div></div>' +
       '<button class="iconbtn" data-src-refresh="' + s.id + '" style="width:34px;height:34px">' + icon('refresh') + '</button>' +
       '<div class="switch ' + (on ? 'on' : '') + '" data-src-toggle="' + s.id + '"><i></i></div>' +
@@ -2142,6 +2161,7 @@ async function refreshSource(src) {
       src.newUrls = items.filter((i) => i.url && !before[i.url]).map((i) => i.url).slice(0, 400);
       src.items = items.slice(0, 4000);
       src.sub = items.length + ' items' + (cols ? ' · ' + cols + ' collections' : '') + (items.length > 4000 ? ' (first 4000)' : '');
+      src.failed = false;
       src.updatedAt = Date.now();
       // grab EPG url from #EXTM3U x-tvg-url
       const m = /x-tvg-url="([^"]+)"/i.exec(txt);
@@ -2225,6 +2245,10 @@ async function refreshSource(src) {
       toast(items.length + ' items loaded from JSON');
     }
   } catch (e) {
+    src.failed = true;
+    src.sub = 'Failed · ' + (e.message || 'network error');
+    save(true);
+    if (STATE.tab === 'settings') renderSettings();
     toast('Failed: ' + (e.message || 'network error'));
     console.warn('[StreamBox] source error', e);
   }
@@ -3009,7 +3033,7 @@ function loadLib(key, globalName) {
 }
 
 const video = $('#video');
-const P = { hls: null, dash: null, ts: null, item: null, list: [], idx: 0, retries: 0, fails: 0, hideT: null, watchdog: null, aspect: null, sleepT: null, statsT: null, altIdx: 0, engineTried: false, engineOverride: null, statTimer: null, drmChecked: false };
+const P = { hls: null, dash: null, ts: null, item: null, list: [], idx: 0, retries: 0, fails: 0, hideT: null, watchdog: null, aspect: null, sleepT: null, statsT: null, altIdx: 0, engineTried: false, engineOverride: null, statTimer: null, drmChecked: false, gen: 0 };
 
 function destroyEngines() {
   try { if (P.hls) { P.hls.destroy(); } } catch (e) { }
@@ -3122,6 +3146,7 @@ function playItem(item, list) {
     item = Object.assign({}, item, { url: DB.bestUrl[item.id] });
   }
   P.item = item;
+  P.gen++;
   P.altIdx = 0; P.engineTried = false; P.engineOverride = null; P.drmChecked = false;
   P.list = Array.isArray(list) && list.length ? list : [item];
   P.idx = Math.max(0, P.list.findIndex((x) => x.id === item.id));
@@ -3153,6 +3178,8 @@ function playItem(item, list) {
 }
 
 function startStream(item, attempt) {
+  const gen = P.gen;
+  const live = () => gen === P.gen;
   destroyEngines();
   clearState();
   const url = item.url;
@@ -3172,6 +3199,7 @@ function startStream(item, attempt) {
     enableWorker: true,
     lowLatencyMode: !!DB.settings.lowLatency,
     backBufferLength: 30,
+    capLevelToPlayerSize: true,
     maxBufferLength: DB.settings.buffer || 30,
     maxMaxBufferLength: Math.max(60, (DB.settings.buffer || 30) * 2),
     liveSyncDurationCount: DB.settings.lowLatency ? 2 : 3,
@@ -3194,6 +3222,7 @@ function startStream(item, attempt) {
 
   if (isDASH(url) && engine !== 'native') {
     loadLib('dash', 'dashjs').then((dashjs) => {
+      if (!live()) return;
       try {
         loadingInfo(url, 'DASH.js');
       P.dash = dashjs.MediaPlayer().create();
@@ -3206,11 +3235,13 @@ function startStream(item, attempt) {
   }
   if (wantHls && window.MediaSource) {
     loadLib('hls', 'Hls').then((Hls) => {
+      if (!live()) return;
       if (!Hls || !Hls.isSupported()) return fallbackNative(url, item, attempt);
       P.hls = new Hls(hlsCfg);
       loadingInfo(url, 'HLS.js');
       P.hls.on(Hls.Events.MANIFEST_PARSED, () => { applyDefaultQuality(); if (DB.settings.autoplay) safePlay(); });
       P.hls.on(Hls.Events.ERROR, (evt, data) => {
+        if (!live()) return;
         if (!data || !data.fatal) return;
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR && P.retries < 1) {
           P.retries++;
@@ -3220,7 +3251,7 @@ function startStream(item, attempt) {
           P.retries++;
           try { P.hls.startLoad(); return; } catch (e) { }
         }
-        handleFailure(item, attempt, data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'Network error' : 'Playback error');
+        handleFailure(item, attempt, data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'Network error' : 'Playback error', gen);
       });
       P.hls.loadSource(url);
       P.hls.attachMedia(video);
@@ -3230,6 +3261,7 @@ function startStream(item, attempt) {
   }
   if (isTS(url) && engine !== 'native' && window.MediaSource) {
     loadLib('mpegts', 'mpegts').then((mpegts) => {
+      if (!live()) return;
       if (!mpegts || !mpegts.isSupported()) return fallbackNative(url, item, attempt);
       loadingInfo(url, 'mpegts.js');
       P.ts = mpegts.createPlayer({ type: 'mse', isLive: true, url: url }, { enableWorker: true, lazyLoad: false, liveBufferLatencyChasing: true });
@@ -3279,13 +3311,16 @@ function mutedHint() {
 }
 function armWatchdog(item, attempt) {
   clearTimeout(P.watchdog);
+  const gen = P.gen;
   const limit = (DB.settings.timeout || 20) * 1000 + 4000;
   P.watchdog = setTimeout(() => {
+    if (gen !== P.gen) return;
     if (video.currentTime > 0 || video.readyState >= 3) return;
-    handleFailure(item, attempt, 'Stream did not start');
+    handleFailure(item, attempt, 'Stream did not start', gen);
   }, limit);
 }
-function handleFailure(item, attempt, msg) {
+function handleFailure(item, attempt, msg, gen) {
+  if (gen !== undefined && gen !== P.gen) return;
   clearTimeout(P.watchdog);
   if (P.retries < 1) {
     P.retries = 1;
@@ -3790,7 +3825,7 @@ video.addEventListener('error', () => {
   const err = video.error;
   if (!err) return;
   if (err.code === 1) return; // aborted (we switched source)
-  handleFailure(P.item, 1, err.code === 4 ? 'Format not supported' : 'Stream unavailable');
+  handleFailure(P.item, 1, err.code === 4 ? 'Format not supported' : 'Stream unavailable', P.gen);
 });
 video.addEventListener('ended', () => {
   if (P.item && P.item.kind === 'pod') {
@@ -4392,6 +4427,7 @@ function boot() {
   $('#liveLayout').innerHTML = icon(LAYOUT_ICON[DB.settings.layout] || 'eye');
   paintIcons(document);
   applyLang();
+  const presetsChanged = ensurePresets();
   buildLibrary();
   renderAll();
   let landing = DB.tab || 'home';
@@ -4425,6 +4461,10 @@ function boot() {
 
   if (DB.settings.epgUrl && !DB.epg.data) setTimeout(() => loadEPG(DB.settings.epgUrl, true), 2500);
   if (DB.settings.autoRefresh !== false) setTimeout(autoRefreshSources, 3500);
+  const phoenix = DB.sources.find((s) => s.url === PHOENIX_URL);
+  if (phoenix && (!phoenix.items || presetsChanged)) {
+    setTimeout(() => refreshSource(phoenix), presetsChanged ? 1200 : 2500);
+  }
 
   if (DB.firstRun) {
     DB.firstRun = false; save(true);
